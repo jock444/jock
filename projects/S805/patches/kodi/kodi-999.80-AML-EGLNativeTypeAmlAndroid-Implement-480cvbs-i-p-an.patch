@@ -1,0 +1,128 @@
+From 2d8e806a9d0f668530787acaa96c65852705d2ea Mon Sep 17 00:00:00 2001
+From: Stanislav Vlasic <svlasic@gmail.com>
+Date: Fri, 11 Sep 2015 10:52:13 +0200
+Subject: [PATCH 1/2] AML: EGLNativeTypeAmlAndroid: Implement 480cvbs/i/p and
+ 576cvbs/i/p modes
+
+---
+ xbmc/utils/AMLUtils.cpp                        | 48 ++++++++++++++++++++++++++
+ xbmc/utils/AMLUtils.h                          |  1 +
+ xbmc/windowing/egl/EGLNativeTypeAmlAndroid.cpp | 26 ++++++++++++++
+ 3 files changed, 75 insertions(+)
+
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index ac2667c..7f7ab62 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -302,6 +302,18 @@ int aml_axis_value(AML_DISPLAY_AXIS_PARAM param)
+   return value[param];
+ }
+ 
++bool aml_IsHdmiConnected()
++{
++  int hpd_state;
++  SysfsUtils::GetInt("/sys/class/amhdmitx/amhdmitx0/hpd_state", hpd_state);
++  if (hpd_state == 2);
++  {
++    return 1;
++  }
++
++  return 0;
++}
++
+ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+ {
+   if (!res)
+@@ -329,6 +341,42 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+     res->fRefreshRate = 60;
+     res->dwFlags = D3DPRESENTFLAG_PROGRESSIVE;
+   }
++  else if ((StringUtils::EqualsNoCase(fromMode, "480cvbs")) || (StringUtils::EqualsNoCase(fromMode, "480i")))
++  {
++    res->iWidth = 720;
++    res->iHeight= 480;
++    res->iScreenWidth = 720;
++    res->iScreenHeight= 480;
++    res->fRefreshRate = 60;
++    res->dwFlags = D3DPRESENTFLAG_INTERLACED;
++  }
++  else if ((StringUtils::EqualsNoCase(fromMode, "576cvbs")) || (StringUtils::EqualsNoCase(fromMode, "576i")))
++  {
++    res->iWidth = 720;
++    res->iHeight= 576;
++    res->iScreenWidth = 720;
++    res->iScreenHeight= 576;
++    res->fRefreshRate = 50;
++    res->dwFlags = D3DPRESENTFLAG_INTERLACED;
++  }
++  else if (StringUtils::EqualsNoCase(fromMode, "480p"))
++  {
++    res->iWidth = 720;
++    res->iHeight= 480;
++    res->iScreenWidth = 720;
++    res->iScreenHeight= 480;
++    res->fRefreshRate = 60;
++    res->dwFlags = D3DPRESENTFLAG_PROGRESSIVE;
++  }
++  else if (StringUtils::EqualsNoCase(fromMode, "576p"))
++  {
++    res->iWidth = 720;
++    res->iHeight= 576;
++    res->iScreenWidth = 720;
++    res->iScreenHeight= 576;
++    res->fRefreshRate = 50;
++    res->dwFlags = D3DPRESENTFLAG_PROGRESSIVE;
++  }
+   else if (StringUtils::EqualsNoCase(fromMode, "720p"))
+   {
+     res->iWidth = 1280;
+diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
+index 76efcaf..81d4d07 100644
+--- a/xbmc/utils/AMLUtils.h
++++ b/xbmc/utils/AMLUtils.h
+@@ -50,4 +50,5 @@ enum AML_DEVICE_TYPE aml_get_device_type();
+ void aml_cpufreq_min(bool limit);
+ void aml_cpufreq_max(bool limit);
+ void aml_set_audio_passthrough(bool passthrough);
++bool aml_IsHdmiConnected();
+ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res);
+diff --git a/xbmc/windowing/egl/EGLNativeTypeAmlAndroid.cpp b/xbmc/windowing/egl/EGLNativeTypeAmlAndroid.cpp
+index 111442c..bd09544 100644
+--- a/xbmc/windowing/egl/EGLNativeTypeAmlAndroid.cpp
++++ b/xbmc/windowing/egl/EGLNativeTypeAmlAndroid.cpp
+@@ -76,6 +76,32 @@ bool CEGLNativeTypeAmlAndroid::SetNativeResolution(const RESOLUTION_INFO &res)
+       switch(res.iScreenWidth)
+       {
+         default:
++        case 720:
++          if (!aml_IsHdmiConnected())
++          {
++            if (res.iScreenHeight == 480)
++              return SetDisplayResolution("480cvbs");
++            else
++              return SetDisplayResolution("576cvbs");
++          }
++          else
++          {
++            if (res.iScreenHeight == 480)
++            {
++              if (res.dwFlags & D3DPRESENTFLAG_INTERLACED)
++                return SetDisplayResolution("480i");
++              else
++                return SetDisplayResolution("480p");
++            }
++            else
++            {
++              if (res.dwFlags & D3DPRESENTFLAG_INTERLACED)
++                return SetDisplayResolution("576i");
++              else
++                return SetDisplayResolution("576p");
++            }
++          }
++          break;
+         case 1280:
+           return SetDisplayResolution("720p");
+           break;
+-- 
+2.5.0
+
